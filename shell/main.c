@@ -4,8 +4,10 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 void executeCommand(char *command, char **arguments, int background);
+void sigHandler (int signum);
 
 int main()
 {
@@ -36,8 +38,8 @@ int main()
             break;
         }
 
-        //itera pelos tokens e guarda em arguments[]
         int i = 0;
+        //itera pelos tokens e guarda os endereços em arguments[]
         while (token != NULL)
         {
             arguments[i] = token;
@@ -66,7 +68,6 @@ void executeCommand(char *command, char **arguments, int background)
 {
 
     pid_t pid = fork();
-    int result;
     int i = 0;
     int status;
 
@@ -74,12 +75,35 @@ void executeCommand(char *command, char **arguments, int background)
     if (pid < 0)
     {
         perror("fork failed");
-        exit(1);
+        return;
     }
     else if (pid == 0) //filho
     {
-        result = execvp(command, arguments);
-        if (result < 0)
+
+        //checa se existe o operador ">"
+        int fd = -1;
+        for (i = 0; arguments[i] != NULL; i++)
+        {
+            if (strcmp(arguments[i], ">") == 0)
+            {
+                fd = open(arguments[i+1], O_WRONLY| O_CREAT| O_TRUNC, S_IWUSR | S_IRUSR);
+                if (fd == -1)
+                {
+                    perror("open failed");
+                    exit(1);
+                }
+                
+                dup2(fd, STDOUT_FILENO);
+                
+                //tira ">" e o nome do arquivo
+                arguments[i] = NULL;
+                arguments[i + 1] = NULL;
+                close(fd);
+                break;
+            }
+        }
+        
+        if (execvp(command, arguments) < 0)
         {
             perror("error");
             exit(1);
@@ -87,10 +111,20 @@ void executeCommand(char *command, char **arguments, int background)
     }
     else    //pai
     {
-        //waitpid() faz com que o processo pai aguarde ate o filho concluir sua execucao, evitando zumbis
+        //wait() em caso de execucao em fg  
         if (!background)
         {
-            waitpid(pid, &status, 0); 
+            wait(NULL);
+            return;
         }
+        signal(SIGCHLD, sigHandler);
     }
+}
+
+void sigHandler (int signum)
+{
+    pid_t pid;
+    int status;
+    pid = waitpid(0, &status, 0);
+    //printf("Child %d terminated: %d %d\n",pid,signum,status);
 }
