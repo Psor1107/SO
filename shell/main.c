@@ -1,3 +1,6 @@
+/*
+Gabriel Lucchetta Garcia Sanchez - 828513
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
