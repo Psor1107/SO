@@ -61,6 +61,7 @@ void executeCommand(char *command, char **arguments, int background)
     pid_t pid = fork();
     int i = 0;
     int status;
+    int oldSTDOUT = 0;
     //checa se o fork falhou
     if (pid < 0)
     {
@@ -81,13 +82,12 @@ void executeCommand(char *command, char **arguments, int background)
                     perror("open failed");
                     exit(1);
                 }
-
+                oldSTDOUT = dup(STDOUT_FILENO);
                 dup2(fd, STDOUT_FILENO);
 
                 //tira ">" e o nome do arquivo
                 arguments[i] = NULL;
                 arguments[i + 1] = NULL;
-                close(fd);
                 break;
             }
         }
@@ -132,6 +132,10 @@ void executeCommand(char *command, char **arguments, int background)
                 perror("exec pipe S");
                 exit(1);
             }
+        }
+        if (oldSTDOUT != 0){
+            dup2(oldSTDOUT, STDOUT_FILENO);
+            close(fd);
         }
     }
     else //pai
